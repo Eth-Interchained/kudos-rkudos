@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Operator console is private; keep it out of the index.
+Disallow: /console
+Disallow: /admin
+
+Sitemap: https://kudos.interchained.org/sitemap.xml

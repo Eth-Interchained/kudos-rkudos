@@ -1,0 +1,40 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import overviewRouter from "./overview";
+import blocksRouter from "./blocks";
+import repliesRouter from "./replies";
+import settlementRouter from "./settlement";
+import participantsRouter from "./participants";
+import payoutsRouter from "./payouts";
+import walletRouter from "./wallet";
+import abuseRouter from "./abuse";
+import auditRouter from "./audit";
+import settingsRouter from "./settings";
+import chainRouter from "./chain";
+import importRouter from "./import";
+import adminRouter from "./admin";
+import projectsRouter from "./projects";
+import contributorsRouter from "./contributors";
+import subscribersRouter from "./subscribers";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(adminRouter);
+router.use(overviewRouter);
+router.use(settingsRouter);
+router.use(chainRouter);
+router.use(importRouter);
+router.use(blocksRouter);
+router.use(repliesRouter);
+router.use(settlementRouter);
+router.use(participantsRouter);
+router.use(payoutsRouter);
+router.use(walletRouter);
+router.use(abuseRouter);
+router.use(auditRouter);
+router.use(projectsRouter);
+router.use(contributorsRouter);
+router.use(subscribersRouter);
+
+export default router;

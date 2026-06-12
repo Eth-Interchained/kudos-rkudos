@@ -1,0 +1,18 @@
+{
+  "name": "Kudos — Interchained Social Mining",
+  "short_name": "Kudos",
+  "description": "Earn ITC tokens for high-quality, original X replies — mined Satoshi-style, every block and payout provable on-chain.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF3C00",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

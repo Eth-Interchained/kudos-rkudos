@@ -1,0 +1,1526 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Social Mining Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: blocks
+    description: Mining block lifecycle
+  - name: replies
+    description: Reply ingestion and scoring
+  - name: participants
+    description: Participant identities and trust
+  - name: settlement
+    description: Settlement and on-chain proofs
+  - name: payouts
+    description: Payout review and disbursement
+  - name: wallet
+    description: Wallet binding
+  - name: abuse
+    description: Abuse and Sybil events
+  - name: audit
+    description: Append-only audit log
+  - name: overview
+    description: Dashboard aggregates
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /overview:
+    get:
+      operationId: getOverview
+      tags: [overview]
+      summary: Platform overview stats
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+
+  /treasury:
+    get:
+      operationId: getTreasury
+      tags: [overview]
+      summary: Treasury dashboard summary
+      responses:
+        "200":
+          description: Treasury
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Treasury"
+
+  /chain/stats:
+    get:
+      operationId: getChainStats
+      tags: [overview]
+      summary: Live Interchained (ITC) layer-1 chain stats from the explorer
+      responses:
+        "200":
+          description: Chain stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChainStats"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [overview]
+      summary: Runtime settings (auto-post toggle, cadence, subsidy)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [overview]
+      summary: Update runtime settings (auto-post toggle)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /admin/import-posts:
+    post:
+      operationId: importXPosts
+      tags: [overview]
+      summary: Import X posts into blocks as closed reward blocks awaiting settlement
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /blocks:
+    get:
+      operationId: listBlocks
+      tags: [blocks]
+      summary: List all blocks
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Block"
+    post:
+      operationId: createBlock
+      tags: [blocks]
+      summary: Create a draft block
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Block"
+
+  /blocks/{seq}:
+    get:
+      operationId: getBlock
+      tags: [blocks]
+      summary: Get a block by sequence number
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Block detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/lifecycle:
+    post:
+      operationId: advanceBlock
+      tags: [blocks]
+      summary: Advance block lifecycle (schedule, post/open, close)
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleAction"
+      responses:
+        "200":
+          description: Updated block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Block"
+        "400":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/sync-netrows:
+    post:
+      operationId: syncBlock
+      tags: [blocks]
+      summary: Sync replies for a block from NetRows (or simulate)
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/generate-post:
+    post:
+      operationId: generateBlockPost
+      tags: [blocks]
+      summary: (Re)generate the AiAS-authored X post content for a block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Block"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/attach-post:
+    post:
+      operationId: attachBlockPost
+      tags: [blocks]
+      summary: Attach the URL of a manually published X post to a block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachPostInput"
+      responses:
+        "200":
+          description: Updated block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Block"
+        "400":
+          description: Invalid URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/settle:
+    post:
+      operationId: settleBlock
+      tags: [settlement]
+      summary: Run settlement for a closed block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Settlement result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settlement"
+        "400":
+          description: Invalid state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [blocks]
+      summary: Live leaderboard for a block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /blocks/{seq}/settlement:
+    get:
+      operationId: getSettlement
+      tags: [settlement]
+      summary: Public settlement proof for a block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Settlement proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementProof"
+        "404":
+          description: Not settled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /blocks/{seq}/replies:
+    get:
+      operationId: listReplies
+      tags: [replies]
+      summary: List replies for a block
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Replies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reply"
+    post:
+      operationId: submitReply
+      tags: [replies]
+      summary: Submit/import a reply (runs scoring pipeline)
+      parameters:
+        - name: seq
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyInput"
+      responses:
+        "201":
+          description: Scored reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reply"
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /participants:
+    get:
+      operationId: listParticipants
+      tags: [participants]
+      summary: List participants
+      responses:
+        "200":
+          description: Participants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Participant"
+
+  /participants/{handle}:
+    get:
+      operationId: getParticipant
+      tags: [participants]
+      summary: Get participant by handle
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParticipantDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /payouts:
+    get:
+      operationId: listPayouts
+      tags: [payouts]
+      summary: List payouts
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: handle
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payout"
+
+  /payouts/{id}/approve:
+    post:
+      operationId: approvePayout
+      tags: [payouts]
+      summary: Approve a held payout (HITL)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated payout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payout"
+
+  /payouts/{id}/hold:
+    post:
+      operationId: holdPayout
+      tags: [payouts]
+      summary: Hold/reject a payout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated payout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payout"
+
+  /payouts/broadcast:
+    post:
+      operationId: broadcastPayouts
+      tags: [payouts]
+      summary: Broadcast all approved payouts for a block via a single sendmany
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastInput"
+      responses:
+        "200":
+          description: Broadcast result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastResult"
+
+  /wallet/bind:
+    post:
+      operationId: walletBind
+      tags: [wallet]
+      summary: Save a contributor's ITC payout address for an X handle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindInput"
+      responses:
+        "200":
+          description: Bound participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        "400":
+          description: Bind failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /subscribers:
+    post:
+      operationId: subscribe
+      tags: [subscribers]
+      summary: Subscribe an email to the weekly digest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeInput"
+      responses:
+        "200":
+          description: Already subscribed (reactivated)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscribeResult"
+        "201":
+          description: Subscribed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscribeResult"
+        "400":
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      operationId: listSubscribers
+      tags: [subscribers]
+      summary: List subscribers (admin)
+      responses:
+        "200":
+          description: Subscribers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriberList"
+
+  /blast-runs:
+    get:
+      operationId: listBlastRuns
+      tags: [subscribers]
+      summary: Weekly blast run history (admin)
+      responses:
+        "200":
+          description: Blast runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlastRunList"
+
+  /blast/run:
+    post:
+      operationId: runBlast
+      tags: [subscribers]
+      summary: Trigger the weekly blast now (admin)
+      responses:
+        "200":
+          description: Blast result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlastResult"
+
+  /abuse-events:
+    get:
+      operationId: listAbuseEvents
+      tags: [abuse]
+      summary: List abuse / Sybil events
+      responses:
+        "200":
+          description: Abuse events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AbuseEvent"
+
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [audit]
+      summary: Append-only audit log
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /projects:
+    get:
+      operationId: listFeaturedProjects
+      tags: [projects]
+      summary: List approved (featured) projects
+      responses:
+        "200":
+          description: Featured projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: applyProject
+      tags: [projects]
+      summary: Apply to feature a project on the chain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyProjectInput"
+      responses:
+        "200":
+          description: Submitted application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getFeaturedProject
+      tags: [projects]
+      summary: Get an approved project and its synced posts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/projects:
+    get:
+      operationId: listProjectsAdmin
+      tags: [projects]
+      summary: List all project applications (admin)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /admin/projects/{id}/review:
+    post:
+      operationId: reviewProject
+      tags: [projects]
+      summary: Approve or reject a project application (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewProjectInput"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /contributors/register:
+    post:
+      operationId: registerContributor
+      tags: [participants]
+      summary: Self-register a contributor (X handle) so a payout address can be bound
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterContributorInput"
+      responses:
+        "200":
+          description: Registered participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        "400":
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Overview:
+      type: object
+      required:
+        - totalBlocks
+        - openBlocks
+        - settledBlocks
+        - totalParticipants
+        - totalReplies
+        - validReplies
+        - rejectedReplies
+        - flaggedReplies
+        - totalRewardItc
+        - totalPaidItc
+        - pendingReview
+      properties:
+        totalBlocks: { type: integer }
+        openBlocks: { type: integer }
+        settledBlocks: { type: integer }
+        totalParticipants: { type: integer }
+        totalReplies: { type: integer }
+        validReplies: { type: integer }
+        rejectedReplies: { type: integer }
+        flaggedReplies: { type: integer }
+        totalRewardItc: { type: number }
+        totalPaidItc: { type: number }
+        pendingReview: { type: integer }
+
+    Treasury:
+      type: object
+      required:
+        - hotWalletBalanceItc
+        - dailyCapItc
+        - dailySpentItc
+        - autoApproveUnderItc
+        - perAccountCapItc
+        - pendingItc
+        - approvedItc
+        - confirmedItc
+        - heldItc
+      properties:
+        hotWalletBalanceItc: { type: number }
+        dailyCapItc: { type: number }
+        dailySpentItc: { type: number }
+        autoApproveUnderItc: { type: number }
+        perAccountCapItc: { type: number }
+        pendingItc: { type: number }
+        approvedItc: { type: number }
+        confirmedItc: { type: number }
+        heldItc: { type: number }
+
+    Block:
+      type: object
+      required:
+        - id
+        - seq
+        - title
+        - topic
+        - rewardItc
+        - requiredKeywords
+        - bonusKeywords
+        - status
+        - replyCount
+        - validCount
+        - createdAt
+      properties:
+        id: { type: string }
+        seq: { type: integer }
+        xPostId: { type: ["string", "null"] }
+        xPostUrl: { type: ["string", "null"] }
+        postContent: { type: ["string", "null"] }
+        xPostedAt: { type: ["string", "null"] }
+        postMode: { type: ["string", "null"] }
+        shareUrl: { type: ["string", "null"] }
+        title: { type: string }
+        topic: { type: string }
+        rewardItc: { type: number }
+        requiredKeywords:
+          type: array
+          items: { type: string }
+        bonusKeywords:
+          type: array
+          items: { type: string }
+        sponsor: { type: ["string", "null"] }
+        status: { type: string }
+        perAccountCapItc: { type: ["number", "null"] }
+        opensAt: { type: ["string", "null"] }
+        closesAt: { type: ["string", "null"] }
+        settledAt: { type: ["string", "null"] }
+        replyCount: { type: integer }
+        validCount: { type: integer }
+        createdAt: { type: string }
+
+    SyncResult:
+      type: object
+      required:
+        - mode
+        - fetched
+        - created
+        - valid
+        - rejected
+        - duplicates
+        - message
+      properties:
+        mode: { type: string }
+        author: { type: ["string", "null"] }
+        fetched: { type: integer }
+        created: { type: integer }
+        valid: { type: integer }
+        rejected: { type: integer }
+        duplicates: { type: integer }
+        message: { type: string }
+
+    Settings:
+      type: object
+      required:
+        - autoPostEnabled
+        - miningStartHeight
+        - rewardsEnabled
+        - dataSource
+        - postingMode
+        - contentMode
+        - blockIntervalMinutes
+        - blockRewardItc
+        - governanceBlocks
+        - governanceSharePct
+        - governanceRewardSumItc
+        - rewardSourceLive
+        - blastEnabled
+        - replySyncEnabled
+      properties:
+        autoPostEnabled: { type: boolean }
+        miningStartHeight: { type: integer }
+        rewardsEnabled: { type: boolean }
+        blastEnabled: { type: boolean }
+        replySyncEnabled: { type: boolean }
+        dataSource: { type: string }
+        postingMode: { type: string }
+        contentMode: { type: string }
+        blockIntervalMinutes: { type: integer }
+        blockRewardItc: { type: number }
+        governanceBlocks: { type: integer }
+        governanceSharePct: { type: number }
+        governanceRewardSumItc: { type: ["number", "null"] }
+        rewardSourceLive: { type: boolean }
+
+    ChainBlock:
+      type: object
+      required:
+        - height
+        - hash
+        - time
+        - explorerUrl
+      properties:
+        height: { type: integer }
+        hash: { type: string }
+        time: { type: integer }
+        minerAddress: { type: ["string", "null"] }
+        explorerUrl: { type: string }
+
+    ChainStats:
+      type: object
+      required:
+        - source
+        - explorerUrl
+        - recentBlocks
+        - fetchedAt
+      properties:
+        source: { type: string }
+        tipHeight: { type: ["integer", "null"] }
+        hashrate: { type: ["number", "null"] }
+        hashrateLabel: { type: ["string", "null"] }
+        difficulty: { type: ["number", "null"] }
+        circulatingItc: { type: ["number", "null"] }
+        circulatingSats: { type: ["number", "null"] }
+        windowBlocks: { type: ["integer", "null"] }
+        explorerUrl: { type: string }
+        recentBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChainBlock"
+        fetchedAt: { type: string }
+
+    SettingsInput:
+      type: object
+      properties:
+        autoPostEnabled: { type: boolean }
+        miningStartHeight: { type: integer, minimum: 0 }
+        rewardsEnabled: { type: boolean }
+        blastEnabled: { type: boolean }
+        replySyncEnabled: { type: boolean }
+
+    ImportResult:
+      type: object
+      required:
+        - imported
+        - skipped
+        - available
+      properties:
+        imported: { type: integer }
+        skipped: { type: integer }
+        available: { type: integer }
+
+    AttachPostInput:
+      type: object
+      required:
+        - xPostUrl
+      properties:
+        xPostUrl: { type: string, minLength: 1 }
+
+    BlockDetail:
+      type: object
+      required:
+        - block
+        - replies
+        - leaderboard
+      properties:
+        block:
+          $ref: "#/components/schemas/Block"
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reply"
+        leaderboard:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaderboardEntry"
+        settlement:
+          oneOf:
+            - $ref: "#/components/schemas/SettlementProof"
+            - type: "null"
+
+    BlockInput:
+      type: object
+      required:
+        - title
+        - topic
+        - rewardItc
+      properties:
+        title: { type: string, minLength: 1 }
+        topic: { type: string, minLength: 1 }
+        rewardItc: { type: number }
+        requiredKeywords:
+          type: array
+          items: { type: string }
+        bonusKeywords:
+          type: array
+          items: { type: string }
+        sponsor: { type: string }
+        perAccountCapItc: { type: number }
+
+    LifecycleAction:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          description: One of schedule, post, close
+
+    Participant:
+      type: object
+      required:
+        - id
+        - xHandle
+        - followersCount
+        - verified
+        - trustScore
+        - behaviorScore
+        - pohTier
+        - banned
+      properties:
+        id: { type: string }
+        xUserId: { type: string }
+        xHandle: { type: string }
+        accountCreated: { type: ["string", "null"] }
+        followersCount: { type: integer }
+        verified: { type: boolean }
+        trustScore: { type: number }
+        behaviorScore: { type: number }
+        pohTier: { type: integer }
+        itcAddress: { type: ["string", "null"] }
+        addressProvedAt: { type: ["string", "null"] }
+        banned: { type: boolean }
+        banReason: { type: ["string", "null"] }
+
+    ParticipantDetail:
+      type: object
+      required:
+        - participant
+        - replies
+        - payouts
+        - totalEarnedItc
+      properties:
+        participant:
+          $ref: "#/components/schemas/Participant"
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reply"
+        payouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payout"
+        totalEarnedItc: { type: number }
+
+    Reply:
+      type: object
+      required:
+        - id
+        - blockId
+        - participantId
+        - handle
+        - replyText
+        - qualityScore
+        - trustWeight
+        - uniqueness
+        - reachFactor
+        - socialHashpower
+        - status
+        - flagged
+        - createdAt
+      properties:
+        id: { type: string }
+        blockId: { type: string }
+        participantId: { type: string }
+        handle: { type: string }
+        followersCount: { type: integer }
+        verified: { type: boolean }
+        xReplyId: { type: string }
+        replyText: { type: string }
+        qualityScore: { type: number }
+        aiScores:
+          oneOf:
+            - $ref: "#/components/schemas/AiScores"
+            - type: "null"
+        trustWeight: { type: number }
+        uniqueness: { type: number }
+        reachFactor: { type: number }
+        socialHashpower: { type: number }
+        status: { type: string }
+        rejectionReason: { type: ["string", "null"] }
+        flagged: { type: boolean }
+        createdAt: { type: string }
+
+    AiScores:
+      type: object
+      required:
+        - relevance
+        - originality
+        - correctness
+        - specificity
+        - isSpam
+        - isGenericFiller
+        - rationale
+      properties:
+        relevance: { type: number }
+        originality: { type: number }
+        correctness: { type: number }
+        specificity: { type: number }
+        isSpam: { type: boolean }
+        isGenericFiller: { type: boolean }
+        rationale: { type: string }
+
+    ReplyInput:
+      type: object
+      required:
+        - handle
+        - replyText
+      properties:
+        handle: { type: string, minLength: 1 }
+        replyText: { type: string, minLength: 1 }
+        followersCount: { type: integer }
+        verified: { type: boolean }
+        accountAgeDays: { type: integer }
+
+    LeaderboardEntry:
+      type: object
+      required:
+        - rank
+        - handle
+        - socialHashpower
+        - qualityScore
+        - trustWeight
+        - estimatedItc
+      properties:
+        rank: { type: integer }
+        handle: { type: string }
+        followersCount: { type: integer }
+        verified: { type: boolean }
+        socialHashpower: { type: number }
+        qualityScore: { type: number }
+        trustWeight: { type: number }
+        uniqueness: { type: number }
+        reachFactor: { type: number }
+        estimatedItc: { type: number }
+        flagged: { type: boolean }
+
+    Settlement:
+      type: object
+      required:
+        - blockId
+        - totalHashpower
+        - validMiners
+        - merkleRoot
+        - payouts
+      properties:
+        blockId: { type: string }
+        totalHashpower: { type: number }
+        validMiners: { type: integer }
+        merkleRoot: { type: string }
+        anchorTxid: { type: ["string", "null"] }
+        payouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payout"
+
+    SettlementProof:
+      type: object
+      required:
+        - blockSeq
+        - blockTitle
+        - totalHashpower
+        - validMiners
+        - rewardItc
+        - merkleRoot
+        - leaves
+      properties:
+        blockSeq: { type: integer }
+        blockTitle: { type: string }
+        totalHashpower: { type: number }
+        validMiners: { type: integer }
+        rewardItc: { type: number }
+        merkleRoot: { type: string }
+        anchorTxid: { type: ["string", "null"] }
+        computedAt: { type: ["string", "null"] }
+        leaves:
+          type: array
+          items:
+            $ref: "#/components/schemas/MerkleLeaf"
+
+    MerkleLeaf:
+      type: object
+      required:
+        - handle
+        - itcAddress
+        - amountItc
+        - leafHash
+      properties:
+        handle: { type: string }
+        itcAddress: { type: string }
+        amountItc: { type: number }
+        leafHash: { type: string }
+
+    Payout:
+      type: object
+      required:
+        - id
+        - blockId
+        - blockSeq
+        - participantId
+        - handle
+        - amountItc
+        - status
+        - confirmations
+        - flagged
+      properties:
+        id: { type: string }
+        blockId: { type: string }
+        blockSeq: { type: integer }
+        participantId: { type: string }
+        handle: { type: string }
+        itcAddress: { type: ["string", "null"] }
+        amountItc: { type: number }
+        idempotencyKey: { type: string }
+        status: { type: string }
+        batchTxid: { type: ["string", "null"] }
+        confirmations: { type: integer }
+        approvedBy: { type: ["string", "null"] }
+        paidAt: { type: ["string", "null"] }
+        flagged: { type: boolean }
+
+    BroadcastInput:
+      type: object
+      required:
+        - blockSeq
+      properties:
+        blockSeq: { type: integer }
+
+    BroadcastResult:
+      type: object
+      required:
+        - batchTxid
+        - recipients
+        - totalItc
+      properties:
+        batchTxid: { type: string }
+        recipients: { type: integer }
+        totalItc: { type: number }
+
+    BindInput:
+      type: object
+      required:
+        - handle
+        - itcAddress
+      properties:
+        handle: { type: string, minLength: 1 }
+        itcAddress: { type: string, minLength: 14, maxLength: 90 }
+        email: { type: string, maxLength: 254 }
+
+    SubscribeInput:
+      type: object
+      required:
+        - email
+      properties:
+        email: { type: string, minLength: 3, maxLength: 254 }
+
+    SubscribeResult:
+      type: object
+      required:
+        - ok
+        - status
+      properties:
+        ok: { type: boolean }
+        status: { type: string }
+
+    Subscriber:
+      type: object
+      required:
+        - id
+        - email
+        - status
+        - createdAt
+      properties:
+        id: { type: string }
+        email: { type: string }
+        status: { type: string }
+        createdAt: { type: string }
+        unsubscribedAt: { type: ["string", "null"] }
+
+    SubscriberList:
+      type: object
+      required:
+        - total
+        - active
+        - subscribers
+      properties:
+        total: { type: integer }
+        active: { type: integer }
+        subscribers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscriber"
+
+    BlastRun:
+      type: object
+      required:
+        - id
+        - periodKey
+        - status
+        - recipientCount
+        - postCount
+        - startedAt
+      properties:
+        id: { type: string }
+        periodKey: { type: string }
+        status: { type: string }
+        recipientCount: { type: integer }
+        postCount: { type: integer }
+        error: { type: ["string", "null"] }
+        startedAt: { type: string }
+        completedAt: { type: ["string", "null"] }
+
+    BlastRunList:
+      type: object
+      required:
+        - runs
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlastRun"
+
+    BlastResult:
+      type: object
+      required:
+        - status
+      properties:
+        status: { type: string }
+        reason: { type: string }
+        periodKey: { type: string }
+        recipientCount: { type: integer }
+        postCount: { type: integer }
+        run:
+          $ref: "#/components/schemas/BlastRun"
+
+    AbuseEvent:
+      type: object
+      required:
+        - id
+        - kind
+        - createdAt
+      properties:
+        id: { type: string }
+        participantId: { type: ["string", "null"] }
+        handle: { type: ["string", "null"] }
+        blockId: { type: ["string", "null"] }
+        blockSeq: { type: ["integer", "null"] }
+        kind: { type: string }
+        detail: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    AuditEntry:
+      type: object
+      required:
+        - id
+        - action
+        - entity
+        - ts
+      properties:
+        id: { type: integer }
+        actor: { type: ["string", "null"] }
+        action: { type: string }
+        entity: { type: string }
+        entityId: { type: ["string", "null"] }
+        detail: { type: ["string", "null"] }
+        ts: { type: string }
+
+    ApplyProjectInput:
+      type: object
+      required:
+        - name
+        - xHandle
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        xHandle: { type: string, minLength: 1, maxLength: 40 }
+        description: { type: string, maxLength: 500 }
+        websiteUrl: { type: string, maxLength: 200 }
+
+    Project:
+      type: object
+      required:
+        - id
+        - name
+        - xHandle
+        - description
+        - status
+        - appliedAt
+        - postCount
+      properties:
+        id: { type: string }
+        name: { type: string }
+        xHandle: { type: string }
+        xUserId: { type: ["string", "null"] }
+        description: { type: string }
+        websiteUrl: { type: ["string", "null"] }
+        status: { type: string }
+        rejectionReason: { type: ["string", "null"] }
+        reviewedAt: { type: ["string", "null"] }
+        appliedAt: { type: string }
+        postCount: { type: integer }
+
+    ProjectPost:
+      type: object
+      required:
+        - id
+        - projectId
+        - xPostId
+        - xPostUrl
+        - text
+        - syncedAt
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        xPostId: { type: string }
+        xPostUrl: { type: string }
+        text: { type: string }
+        syncedAt: { type: string }
+
+    ProjectDetail:
+      type: object
+      required:
+        - project
+        - posts
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectPost"
+
+    ReviewProjectInput:
+      type: object
+      required:
+        - decision
+      properties:
+        decision: { type: string, enum: ["approve", "reject"] }
+        reason: { type: string, maxLength: 300 }
+
+    RegisterContributorInput:
+      type: object
+      required:
+        - handle
+      properties:
+        handle: { type: string, minLength: 1, maxLength: 40 }
