@@ -3,6 +3,8 @@ import { logger } from "./lib/logger";
 import { seedDatabase } from "./services/seed";
 import { startScheduler, startReplySync } from "./services/scheduler";
 import { startBlastScheduler } from "./services/blast";
+import { ensureForumDefaults, backfillForumFromBlocks } from "./services/forumBridge";
+import { getMiningStartHeight } from "./services/settings";
 
 const rawPort = process.env["PORT"];
 
@@ -27,8 +29,16 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 
   seedDatabase(logger)
-    .catch((seedErr) => {
-      logger.error({ err: seedErr }, "Database seed failed");
+    .then(async () => {
+      // rKudos boot backfill: seed forum categories + the @interchained system
+      // participant, then materialize threads/posts for all historical blocks,
+      // their scored replies, and approved projects. Idempotent — converges in
+      // one pass and no-ops on every boot after.
+      await ensureForumDefaults();
+      await backfillForumFromBlocks(await getMiningStartHeight(), logger);
+    })
+    .catch((bootErr) => {
+      logger.error({ err: bootErr }, "Database seed / rKudos backfill failed");
     })
     .finally(() => {
       startScheduler(logger);
