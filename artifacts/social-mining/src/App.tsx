@@ -16,6 +16,10 @@ import Projects from "@/pages/public/Projects";
 import ProjectDetail from "@/pages/public/ProjectDetail";
 import ProjectApply from "@/pages/public/ProjectApply";
 import Register from "@/pages/public/Register";
+import Forum from "@/pages/public/Forum";
+import ForumCategory from "@/pages/public/ForumCategory";
+import ForumThread from "@/pages/public/ForumThread";
+import ForumSearch from "@/pages/public/ForumSearch";
 
 // Console Pages
 import Dashboard from "@/pages/console/Dashboard";
@@ -24,6 +28,7 @@ import ReviewQueue from "@/pages/console/ReviewQueue";
 import ProjectApplications from "@/pages/console/ProjectApplications";
 import AbuseEvents from "@/pages/console/AbuseEvents";
 import AuditLog from "@/pages/console/AuditLog";
+import ForumModeration from "@/pages/console/ForumModeration";
 
 import { Layout } from "@/components/layout/Layout";
 import { ConsoleLayout } from "@/components/layout/ConsoleLayout";
@@ -46,6 +51,10 @@ function PublicRouter() {
         <Route path="/projects/:id" component={ProjectDetail} />
         <Route path="/apply" component={ProjectApply} />
         <Route path="/register" component={Register} />
+        <Route path="/forum" component={Forum} />
+        <Route path="/forum/search" component={ForumSearch} />
+        <Route path="/forum/c/:slug" component={ForumCategory} />
+        <Route path="/forum/t/:id" component={ForumThread} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -63,6 +72,7 @@ function ConsoleRouter() {
           <Route path="/console/projects" component={ProjectApplications} />
           <Route path="/console/abuse" component={AbuseEvents} />
           <Route path="/console/audit" component={AuditLog} />
+          <Route path="/console/forum" component={ForumModeration} />
           <Route component={NotFound} />
         </Switch>
       </ConsoleLayout>
