@@ -23,6 +23,7 @@ import { scoreReply } from "./integrations/aias";
 import { lookupUser } from "./integrations/x";
 import { scoringConfig } from "./config";
 import { recordAudit } from "./audit";
+import { mirrorReplyToPost } from "./forumBridge";
 
 export interface ReplyInputOverrides {
   followersCount?: number;
@@ -115,7 +116,14 @@ export interface PipelineResult {
  */
 export async function ingestAndScoreReply(
   block: Block,
-  input: { handle: string; replyText: string; xReplyId?: string } & ReplyInputOverrides,
+  input: {
+    handle: string;
+    replyText: string;
+    xReplyId?: string;
+    /** rKudos: present for forum-native submissions; null/absent for X-sourced
+     *  replies. Threaded only to the forum mirror — never into scoring inputs. */
+    miningKeyHash?: string;
+  } & ReplyInputOverrides,
   log?: Logger,
 ): Promise<PipelineResult | null> {
   const cfg = scoringConfig();
@@ -289,6 +297,15 @@ export async function ingestAndScoreReply(
       flagged,
     },
   });
+
+  // rKudos (Direction 1): mirror this scored reply into the block's forum thread.
+  // Idempotent (UNIQUE reply_id); null mining key for X-sourced replies => a
+  // read-only post. Wrapped so a forum failure can never affect scoring/settlement.
+  try {
+    await mirrorReplyToPost(block, inserted[0], participant, input.miningKeyHash ?? null);
+  } catch (err) {
+    log?.warn({ err }, "rKudos: mirrorReplyToPost failed (non-fatal)");
+  }
 
   return { reply: inserted[0], participant };
 }

@@ -16,6 +16,7 @@ import adminRouter from "./admin";
 import projectsRouter from "./projects";
 import contributorsRouter from "./contributors";
 import subscribersRouter from "./subscribers";
+import forumRouter from "./forum";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(auditRouter);
 router.use(projectsRouter);
 router.use(contributorsRouter);
 router.use(subscribersRouter);
+router.use(forumRouter);
 
 export default router;

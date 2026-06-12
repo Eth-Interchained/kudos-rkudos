@@ -16,6 +16,7 @@ import {
 } from "./settings";
 import { recordAudit } from "./audit";
 import { withLock } from "./lock";
+import { ensureThreadForBlock } from "./forumBridge";
 
 /** Evergreen topics rotated through for auto-mined blocks. */
 const AUTO_TOPICS: Array<{
@@ -231,6 +232,16 @@ export async function openBlockNow(block: Block, log?: Logger): Promise<Block> {
       entityId: fresh.id,
       detail: { seq: fresh.seq, postMode: patch.postMode, autoPost },
     });
+
+    // rKudos (Direction 1): materialize the forum thread for this freshly-opened
+    // block, with its AiAS-cooked OP. Idempotent (UNIQUE block_id). Wrapped so a
+    // forum failure can NEVER break block opening — the money path is sacred.
+    try {
+      await ensureThreadForBlock(rows[0], "mining");
+    } catch (err) {
+      log?.warn({ err, seq: fresh.seq }, "rKudos: ensureThreadForBlock failed (non-fatal)");
+    }
+
     return rows[0];
   });
 }

@@ -133,6 +133,46 @@ export async function scoreReply(
   }
 }
 
+/**
+ * Generic AiAS chat helper for the rKudos agentic layer (summaries, Ask AiAS,
+ * moderation triage). Returns null (never fabricated text) when AiAS is not
+ * configured or the call fails, so callers degrade gracefully.
+ */
+export async function aiasChat(
+  messages: Array<{ role: string; content: string }>,
+  opts?: { maxTokens?: number; temperature?: number },
+  log?: Logger,
+): Promise<string | null> {
+  const apiKey = secret("AIAS_API_KEY");
+  if (!apiKey) return null;
+  const url = resolveAiasUrl();
+  const model = secret("AIAS_MODEL") ?? DEFAULT_MODEL;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: aiasHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        max_tokens: opts?.maxTokens ?? 400,
+        temperature: opts?.temperature ?? 0.3,
+        messages,
+      }),
+    });
+    if (!res.ok) {
+      log?.warn({ status: res.status }, "AiAS chat failed");
+      return null;
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = (data.choices?.[0]?.message?.content ?? "").trim();
+    return text || null;
+  } catch (err) {
+    log?.warn({ err }, "AiAS chat error");
+    return null;
+  }
+}
+
 // ---- Block post generation ("AiAS cooks the content") --------------------
 
 export interface BlockPostContext {
