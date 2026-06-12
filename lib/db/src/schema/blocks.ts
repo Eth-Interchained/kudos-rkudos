@@ -30,6 +30,12 @@ export const blocksTable = sqliteTable("blocks", {
   opensAt: text("opens_at"),
   closesAt: text("closes_at"),
   settledAt: text("settled_at"),
+  /**
+   * rKudos bridge: the forum thread materialized from this block (1:1). The
+   * runtime UNIQUE constraint is a partial index over non-null values created
+   * in lib/db/src/index.ts (SQLite cannot ALTER-ADD a UNIQUE column).
+   */
+  threadId: text("thread_id").unique(),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
